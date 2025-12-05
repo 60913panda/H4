@@ -1,0 +1,567 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>The Backrooms: Melodic Horror</title>
+    <style>
+        body { margin: 0; overflow: hidden; background-color: #000; font-family: 'Courier New', 'Microsoft JhengHei', monospace; touch-action: none; }
+        
+        /* VHS 濾鏡 - 降低透明度讓畫面更清晰一點 */
+        #vhs-layer {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.1) 50%), 
+                        linear-gradient(90deg, rgba(255, 0, 0, 0.06), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.06));
+            background-size: 100% 3px, 3px 100%;
+            pointer-events: none; z-index: 5; opacity: 0.12;
+        }
+        #vignette {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: radial-gradient(circle, rgba(0,0,0,0) 60%, rgba(0,0,0,0.8) 100%);
+            pointer-events: none; z-index: 6;
+        }
+
+        /* UI 層 */
+        #ui-layer {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            pointer-events: none; z-index: 10;
+        }
+
+        #info {
+            position: absolute; top: 20px; width: 100%; text-align: center;
+            color: #d4c87c; text-shadow: 1px 1px 2px #000; font-weight: bold; font-size: 16px; letter-spacing: 2px;
+        }
+        
+        #status-msg {
+            position: absolute; top: 60px; width: 100%; text-align: center;
+            font-size: 16px; color: #a33; opacity: 0; transition: opacity 0.5s; text-shadow: 0 0 5px #f00; font-weight: bold;
+        }
+
+        #stamina-container {
+            position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%);
+            width: 200px; color: #d1c168; font-size: 14px; text-align: center; opacity: 0.9;
+            font-weight: bold;
+        }
+        #stamina-bar-bg { width: 100%; height: 8px; background: #222; margin-top: 4px; border: 1px solid #554d24; }
+        #stamina-bar { width: 100%; height: 100%; background-color: #d1c168; transition: width 0.1s; }
+
+        /* 手機控制 */
+        .mobile-controls { display: none; pointer-events: auto; }
+        
+        #joystick-area {
+            position: absolute; bottom: 50px; left: 30px; width: 120px; height: 120px;
+            background: rgba(255, 255, 255, 0.05); border: 2px solid rgba(255, 255, 255, 0.1);
+            border-radius: 50%; touch-action: none;
+        }
+        #joystick-knob {
+            position: absolute; top: 50%; left: 50%; width: 40px; height: 40px;
+            background: rgba(212, 200, 124, 0.4); border-radius: 50%; transform: translate(-50%, -50%);
+        }
+        #sprint-btn {
+            position: absolute; bottom: 70px; right: 30px; width: 70px; height: 70px;
+            background: rgba(180, 0, 0, 0.3); border: 2px solid rgba(255, 50, 50, 0.4);
+            border-radius: 50%; color: #fff; display: flex; align-items: center; justify-content: center;
+            font-weight: bold; user-select: none; touch-action: none; font-size: 16px;
+        }
+        #sprint-btn:active { background: rgba(255, 0, 0, 0.6); }
+        
+        #pause-btn {
+            position: absolute; top: 20px; right: 20px; width: 40px; height: 40px;
+            background: rgba(0,0,0,0.5); border: 1px solid #d4c87c; color: #d4c87c;
+            border-radius: 5px; font-size: 18px; display: flex; align-items: center; justify-content: center;
+            cursor: pointer; pointer-events: auto; z-index: 100;
+        }
+
+        #look-area {
+            position: absolute; top: 0; right: 0; bottom: 0; left: 50%; z-index: 9; touch-action: none;
+        }
+
+        /* 選單 */
+        #blocker {
+            position: absolute; width: 100%; height: 100%; background-color: #080808;
+            display: flex; flex-direction: column; justify-content: center; align-items: center;
+            color: #d1c168; z-index: 20;
+        }
+        #loading-text { font-size: 24px; color: #aaa; animation: pulse 1s infinite; }
+
+        .menu-screen { display: none; text-align: center; width: 100%; }
+        .menu-title { font-size: 36px; margin-bottom: 5px; font-family: sans-serif; letter-spacing: -2px; text-transform: uppercase; }
+        .menu-subtitle { color: #888; font-size: 16px; margin-bottom: 30px; }
+        .menu-btn {
+            border: 1px solid #555; padding: 15px 40px; margin: 10px auto; cursor: pointer; background: #111;
+            width: 220px; color: #d1c168; font-family: 'Microsoft JhengHei', sans-serif; font-size: 18px; font-weight: bold; display: block; transition: 0.2s;
+        }
+        .menu-btn:hover { background: #d1c168; color: #000; border-color: #d1c168; }
+
+        .glitch-active { animation: glitch 0.1s infinite; }
+        @keyframes glitch { 0% { transform: translate(0); } 20% { transform: translate(-3px, 3px); } 40% { transform: translate(3px, -3px); } 60% { transform: translate(-3px, -3px); } 80% { transform: translate(3px, 3px); } 100% { transform: translate(0); } }
+        
+        #scare-flash {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: #000; display: flex; align-items: center; justify-content: center;
+            opacity: 0; pointer-events: none; z-index: 50; transition: opacity 0.2s;
+        }
+        #scare-face { font-size: 100px; color: #800; display: none; text-shadow: 0 0 30px red; }
+
+        /* 版權 Footer */
+        .footer {
+            position: absolute; bottom: 0; width: 100%; background-color: #000; color: #444;
+            text-align: center; padding: 6px 0; font-size: 11px; z-index: 100;
+            border-top: 1px solid #222; pointer-events: auto;
+        }
+        .footer a { color: #666; text-decoration: none; transition: color 0.3s; }
+        .footer a:hover { color: #d1c168; }
+    </style>
+</head>
+<body>
+
+    <div id="vhs-layer"></div>
+    <div id="vignette"></div>
+    <div id="scare-flash"><div id="scare-face">:(</div></div>
+
+    <div id="blocker">
+        <div id="loading-text">正在生成迷宮...</div>
+
+        <!-- 開始選單 -->
+        <div id="start-menu" class="menu-screen">
+            <h1 class="menu-title">THE BACKROOMS</h1>
+            <p class="menu-subtitle">Level 0: 「大廳」</p>
+            <button class="menu-btn" id="start-btn">進入後室</button>
+            <p style="font-size: 12px; color: #d1c168; margin-top: 20px;">
+                ♫ 音樂模式：黑暗鋼琴 (Dark Ambience)<br>請務必開啟聲音
+            </p>
+            <p id="pc-hint" style="font-size: 12px; color: #444; margin-top: 5px;">[ESC] 暫停遊戲</p>
+        </div>
+
+        <!-- 暫停選單 -->
+        <div id="pause-menu" class="menu-screen">
+            <h1 class="menu-title">遊戲暫停</h1>
+            <button class="menu-btn" id="resume-btn">繼續遊戲</button>
+            <button class="menu-btn" id="restart-btn">重新開始</button>
+            <button class="menu-btn" id="quit-btn">離開遊戲</button>
+        </div>
+        
+        <!-- 勝利選單 -->
+        <div id="end-menu" class="menu-screen">
+             <h1 class="menu-title" style="color:#0f0">重返現實</h1>
+             <p class="menu-subtitle">你找到了出口。</p>
+             <button class="menu-btn" onclick="location.reload()">再玩一次</button>
+        </div>
+    </div>
+
+    <div id="ui-layer">
+        <div id="info">尋找 <span style="color:#0f0; text-shadow:0 0 5px #0f0">綠色光芒</span></div>
+        <div id="status-msg"></div>
+        <div id="stamina-container">
+            體力 (STAMINA)
+            <div id="stamina-bar-bg"><div id="stamina-bar"></div></div>
+        </div>
+        
+        <div id="pause-btn">||</div>
+
+        <div id="joystick-area" class="mobile-controls"><div id="joystick-knob"></div></div>
+        <div id="sprint-btn" class="mobile-controls">奔跑</div>
+        <div id="look-area" class="mobile-controls"></div>
+    </div>
+
+    <div id="game-container"></div>
+
+    <div class="footer">
+        版權所有 © 2025 <a href="https://60913panda.github.io/PPAW/" target="_blank">PandaPanda的AI日常</a> All Rights Reserved.
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    
+    <script>
+        // --- 核心變數 ---
+        let camera, scene, renderer;
+        let gameActive = false, isPaused = false;
+        let isMobile = false;
+        let startTime = 0;
+        
+        // 移動控制
+        let moveForward = false, moveBackward = false, moveLeft = false, moveRight = false;
+        let isSprinting = false;
+        let stamina = 100;
+        let prevTime = performance.now();
+        
+        // 手機觸控
+        let joystickVector = { x: 0, y: 0 };
+        let joyTouchId = null;
+        let lookTouchId = null;
+        let prevLookX = 0;
+
+        // 地圖設定
+        const CELL_SIZE = 30;
+        const MAP_SIZE = 28;
+        const WALL_HEIGHT = 25;
+        const walls = []; 
+        let mazeGrid = [];
+        let exitPos = null;
+
+        // 實體設定
+        const entities = [];
+        const ENTITY_COUNT = 6;
+        let caughtCooldown = false;
+
+        // 音樂與音效
+        let audioCtx;
+        let masterGain;
+        let musicInterval;
+        let lastBeat = 0;
+
+        window.onload = function() {
+            detectDevice();
+            init();
+            renderer.render(scene, camera);
+            document.getElementById('loading-text').style.display = 'none';
+            document.getElementById('start-menu').style.display = 'block';
+        };
+
+        function detectDevice() {
+            isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+            if(isMobile) {
+                document.querySelectorAll('.mobile-controls').forEach(el => el.style.display = 'block');
+                document.getElementById('pc-hint').style.display = 'none';
+            }
+        }
+
+        function init() {
+            const container = document.getElementById('game-container');
+
+            scene = new THREE.Scene();
+            const fogColor = 0xb8aa65; 
+            scene.background = new THREE.Color(fogColor);
+            scene.fog = new THREE.FogExp2(fogColor, 0.025); 
+
+            camera = new THREE.PerspectiveCamera(70, window.innerWidth/window.innerHeight, 0.1, 400);
+            camera.position.y = 8;
+
+            scene.add(new THREE.AmbientLight(0xffddaa, 0.5));
+            const torch = new THREE.SpotLight(0xffffee, 0.8, 50, 0.6, 0.5);
+            camera.add(torch); camera.add(torch.target); torch.target.position.set(0,0,-1);
+            scene.add(camera);
+
+            const wTex = createTexture('#cfc27e', '#968b58', 'wall'); 
+            const fTex = createTexture('#8f8668', '#5e5843', 'floor');
+            const cTex = createTexture('#dcdcdc', '#bbbbbb', 'ceil');
+            
+            const wallMat = new THREE.MeshLambertMaterial({map: wTex});
+            const floorMat = new THREE.MeshLambertMaterial({map: fTex});
+            const ceilMat = new THREE.MeshLambertMaterial({map: cTex});
+
+            generateMaze(wallMat, floorMat, ceilMat);
+
+            const sGeo = new THREE.IcosahedronGeometry(4, 0); 
+            const sMat = new THREE.MeshBasicMaterial({color:0x000000});
+            const eGeo = new THREE.SphereGeometry(0.5, 4, 4);
+            const eMat = new THREE.MeshBasicMaterial({color:0xffffff}); 
+
+            for(let i=0; i<ENTITY_COUNT; i++) {
+                const g = new THREE.Group();
+                const body = new THREE.Mesh(sGeo, sMat);
+                body.scale.set(1, 1.5, 1);
+                const le = new THREE.Mesh(eGeo, eMat); le.position.set(-1.2, 2, 3);
+                const re = new THREE.Mesh(eGeo, eMat); re.position.set(1.2, 2, 3);
+                g.add(body); g.add(le); g.add(re);
+                scene.add(g);
+                g.position.set(0, -500, 0); 
+                entities.push({ mesh: g, speed: 18 + Math.random()*4, active: true });
+            }
+
+            createExit();
+
+            renderer = new THREE.WebGLRenderer({antialias:false, powerPreference: "high-performance"});
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
+            container.appendChild(renderer.domElement);
+
+            setupControls();
+            window.addEventListener('resize', onResize);
+            animate();
+        }
+
+        function createTexture(c1, c2, type) {
+            const size = 64;
+            const cvs = document.createElement('canvas'); cvs.width=size; cvs.height=size;
+            const ctx = cvs.getContext('2d');
+            ctx.fillStyle = c1; ctx.fillRect(0,0,size,size);
+            ctx.fillStyle = c2; ctx.globalAlpha = 0.15;
+            for(let i=0;i<50;i++) ctx.fillRect(Math.random()*size, Math.random()*size, 2, 2);
+            if(type === 'wall') { ctx.fillStyle='#554422'; ctx.globalAlpha=0.05; ctx.fillRect(0,0,2,size); ctx.fillRect(size/2,0,2,size); }
+            else if(type === 'ceil') { ctx.fillStyle='#888'; ctx.globalAlpha=0.1; ctx.strokeRect(0,0,size,size); }
+            else if(type === 'floor') { ctx.fillStyle='#332211'; ctx.globalAlpha=0.1; ctx.beginPath(); ctx.arc(Math.random()*size, Math.random()*size, 10, 0, Math.PI*2); ctx.fill(); }
+            const t = new THREE.CanvasTexture(cvs); t.magFilter = THREE.LinearFilter; t.minFilter = THREE.LinearMipMapLinearFilter; t.wrapS=t.wrapT=THREE.RepeatWrapping; return t;
+        }
+
+        function generateMaze(wMat, fMat, cMat) {
+            const w = MAP_SIZE*2+1; mazeGrid = Array(w).fill().map(()=>Array(w).fill(1));
+            const stack = [{x:1, y:1}]; mazeGrid[1][1] = 0;
+            while(stack.length>0) {
+                const cur = stack.pop();
+                const dirs = [[0,-2],[0,2],[-2,0],[2,0]].sort(()=>Math.random()-0.5);
+                let found = false;
+                for(let d of dirs) {
+                    const nx = cur.x + d[0], ny = cur.y + d[1];
+                    if(nx>0 && nx<w-1 && ny>0 && ny<w-1 && mazeGrid[nx][ny]===1) {
+                        mazeGrid[nx][ny] = 0; mazeGrid[cur.x + d[0]/2][cur.y + d[1]/2] = 0;
+                        stack.push(cur); stack.push({x:nx, y:ny}); found = true; break;
+                    }
+                }
+                if(!found && Math.random()<0.25) { const d = dirs[0]; const nx = cur.x + d[0], ny = cur.y + d[1]; if(nx>0 && nx<w-1 && ny>0 && ny<w-1) mazeGrid[nx][ny]=0; }
+            }
+            const cx = Math.floor(w/2); for(let i=-2; i<=2; i++) for(let j=-2; j<=2; j++) mazeGrid[cx+i][cx+j] = 0;
+            camera.position.set(cx*CELL_SIZE, 8, cx*CELL_SIZE);
+            const hugeSize = w * CELL_SIZE;
+            const floorGeo = new THREE.PlaneGeometry(hugeSize, hugeSize); floorGeo.rotateX(-Math.PI/2);
+            const floor = new THREE.Mesh(floorGeo, fMat); floor.position.set(cx*CELL_SIZE, 0, cx*CELL_SIZE); fMat.map.repeat.set(w, w); scene.add(floor);
+            const ceilGeo = new THREE.PlaneGeometry(hugeSize, hugeSize); ceilGeo.rotateX(Math.PI/2);
+            const ceil = new THREE.Mesh(ceilGeo, cMat); ceil.position.set(cx*CELL_SIZE, WALL_HEIGHT, cx*CELL_SIZE); cMat.map.repeat.set(w, w); scene.add(ceil);
+            const wallGeo = new THREE.BoxGeometry(CELL_SIZE, WALL_HEIGHT, CELL_SIZE);
+            for(let i=0; i<w; i++) { for(let j=0; j<w; j++) { if(mazeGrid[i][j]===1) { const px = i*CELL_SIZE; const pz = j*CELL_SIZE; const wall = new THREE.Mesh(wallGeo, wMat); wall.position.set(px, WALL_HEIGHT/2, pz); scene.add(wall); walls.push({x:px, z:pz}); } } }
+        }
+
+        function createExit() {
+            let maxDist = 0; let ex = 1, ez = 1; const cx = Math.floor(mazeGrid.length/2);
+            for(let i=1; i<mazeGrid.length-1; i++) { for(let j=1; j<mazeGrid.length-1; j++) { if(mazeGrid[i][j]===0) { const dist = Math.pow(i-cx, 2) + Math.pow(j-cx, 2); if(dist > maxDist) { maxDist = dist; ex = i; ez = j; } } } }
+            exitPos = new THREE.Vector3(ex*CELL_SIZE, 0, ez*CELL_SIZE);
+            const door = new THREE.Mesh(new THREE.BoxGeometry(20,24,2), new THREE.MeshBasicMaterial({color:0x00ff00})); door.position.set(exitPos.x, 12, exitPos.z); scene.add(door);
+            const l = new THREE.PointLight(0x00ff00, 2, 80); l.position.set(exitPos.x, 15, exitPos.z); scene.add(l);
+        }
+
+        // --- 真正的音樂系統 (Dark Piano / Melody Generator) ---
+        function ensureAudioContext() {
+            if(!audioCtx) {
+                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                masterGain = audioCtx.createGain();
+                masterGain.gain.value = 0.5;
+                masterGain.connect(audioCtx.destination);
+                
+                // 開始播放背景音樂循環
+                startMusicLoop();
+            } else if (audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+        }
+
+        // 播放一個鋼琴音符 (合成音)
+        function playNote(freq, duration, type = 'sine') {
+            if(!audioCtx || audioCtx.state === 'suspended') return;
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            
+            osc.type = type;
+            osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+            
+            // 鋼琴的 Envelope: 快速 Attack, 慢速 Decay
+            const now = audioCtx.currentTime;
+            gain.gain.setValueAtTime(0, now);
+            gain.gain.linearRampToValueAtTime(0.3, now + 0.05); // Attack
+            gain.gain.exponentialRampToValueAtTime(0.001, now + duration); // Decay
+            
+            osc.connect(gain).connect(masterGain);
+            osc.start();
+            osc.stop(now + duration + 1);
+        }
+
+        // 詭異旋律生成器
+        function startMusicLoop() {
+            // 一些比較陰森的音符 (C Minor / Diminished)
+            // C3, Eb3, Gb3, G3, B2, C3...
+            const scale = [130.81, 155.56, 185.00, 196.00, 123.47]; 
+            
+            let noteIndex = 0;
+            
+            function playStep() {
+                if(!gameActive || isPaused) {
+                    setTimeout(playStep, 1000);
+                    return;
+                }
+
+                // 隨機選擇一個音符，或者按照順序
+                const freq = scale[Math.floor(Math.random() * scale.length)];
+                
+                // 偶爾播放低音 (Bass)
+                if(Math.random() < 0.3) {
+                    playNote(freq / 2, 4.0, 'triangle'); // 低八度，聲音較厚
+                } else {
+                    playNote(freq, 2.5, 'sine'); // 中音，聲音較清脆
+                }
+                
+                // 下一個音符的時間：隨機 2~5 秒 (不規則節奏更恐怖)
+                const nextTime = 2000 + Math.random() * 3000;
+                setTimeout(playStep, nextTime);
+            }
+            
+            playStep();
+        }
+
+        function playHeartbeat() {
+            if(!audioCtx || audioCtx.state === 'suspended') return;
+            const t = audioCtx.currentTime;
+            const o = audioCtx.createOscillator(); 
+            o.frequency.setValueAtTime(70, t);
+            o.frequency.exponentialRampToValueAtTime(10, t+0.1);
+            const g = audioCtx.createGain(); 
+            g.gain.setValueAtTime(0, t);
+            g.gain.linearRampToValueAtTime(1.0, t+0.02);
+            g.gain.exponentialRampToValueAtTime(0.01, t+0.25);
+            o.connect(g).connect(masterGain); 
+            o.start(); o.stop(t+0.3);
+        }
+
+        function playJumpscareSound() {
+            if(!audioCtx || audioCtx.state === 'suspended') return;
+            const o = audioCtx.createOscillator(); 
+            o.type='sawtooth';
+            o.frequency.setValueAtTime(100, audioCtx.currentTime);
+            o.frequency.linearRampToValueAtTime(800, audioCtx.currentTime+0.2); 
+            const g = audioCtx.createGain(); g.gain.value = 0.8;
+            o.connect(g).connect(masterGain); 
+            o.start(); o.stop(audioCtx.currentTime+0.4);
+        }
+
+        // --- 遊戲邏輯 ---
+        function updateEntity(ent, dt, time) {
+            const m = ent.mesh;
+            const d = m.position.distanceTo(camera.position);
+
+            if(d > 110 || m.position.y < -10) { respawnEntity(m); return; }
+
+            m.lookAt(camera.position);
+            const toP = new THREE.Vector3().subVectors(camera.position, m.position).normalize();
+            
+            let s = ent.speed;
+            if(d > 70) s *= 1.8; else if(d < 20) s *= 0.7;
+
+            m.position.add(toP.multiplyScalar(s*dt));
+            m.position.y = 8 + Math.sin(time*0.004 + ent.mesh.id)*2;
+
+            if(d < 4) triggerCatch();
+        }
+
+        function respawnEntity(mesh) {
+            let placed = false;
+            const camDir = new THREE.Vector3(); camera.getWorldDirection(camDir); camDir.y=0; camDir.normalize();
+            for(let i=0; i<10; i++) {
+                const angle = Math.random() * Math.PI * 2;
+                const dist = 60 + Math.random() * 30; 
+                const px = camera.position.x + Math.cos(angle)*dist;
+                const pz = camera.position.z + Math.sin(angle)*dist;
+                const vecTo = new THREE.Vector3(px - camera.position.x, 0, pz - camera.position.z).normalize();
+                if(camDir.dot(vecTo) < 0.3) { mesh.position.set(px, 8, pz); placed = true; break; }
+            }
+            if(!placed) mesh.position.set(camera.position.x - camDir.x*70, 8, camera.position.z - camDir.z*70);
+        }
+
+        function triggerCatch() {
+            if(caughtCooldown) return;
+            caughtCooldown = true;
+            const flash = document.getElementById('scare-flash'); const face = document.getElementById('scare-face');
+            flash.style.opacity = 1; face.style.display = 'block'; document.body.classList.add('glitch-active');
+            entities.forEach(e => { e.active = false; e.mesh.position.y = -500; });
+            playJumpscareSound();
+            setTimeout(() => {
+                flash.style.opacity = 0; face.style.display = 'none'; document.body.classList.remove('glitch-active');
+                camera.position.z += 10;
+                const msg = document.getElementById('status-msg'); msg.innerText = "它還在這裡..."; msg.style.opacity = 1;
+                setTimeout(() => { caughtCooldown = false; msg.style.opacity = 0; entities.forEach(e => { e.active = true; respawnEntity(e.mesh); }); }, 4000);
+            }, 500);
+        }
+
+        function togglePause() {
+            if(!gameActive && !isPaused) return;
+            isPaused = !isPaused;
+            const pMenu = document.getElementById('pause-menu'); const blocker = document.getElementById('blocker');
+            if(isPaused) {
+                gameActive = false; blocker.style.display = 'flex'; pMenu.style.display = 'block';
+                document.exitPointerLock(); if(audioCtx) audioCtx.suspend();
+            } else {
+                gameActive = true; blocker.style.display = 'none'; pMenu.style.display = 'none';
+                if(!isMobile) document.body.requestPointerLock();
+                if(audioCtx) audioCtx.resume(); prevTime = performance.now();
+            }
+        }
+
+        function setupControls() {
+            document.getElementById('start-btn').addEventListener('click', () => {
+                ensureAudioContext();
+                startTime = performance.now();
+                gameActive = true;
+                document.getElementById('start-menu').style.display = 'none';
+                document.getElementById('blocker').style.display = 'none';
+                entities.forEach(e => respawnEntity(e.mesh));
+                if(!isMobile) document.body.requestPointerLock();
+            });
+            document.getElementById('pause-btn').addEventListener('click', togglePause);
+            document.getElementById('resume-btn').addEventListener('click', togglePause);
+            document.getElementById('restart-btn').addEventListener('click', () => location.reload());
+            document.getElementById('quit-btn').addEventListener('click', () => location.reload());
+
+            if(!isMobile) {
+                document.addEventListener('keydown', e => {
+                    if(e.code==='KeyW') moveForward=true; if(e.code==='KeyS') moveBackward=true;
+                    if(e.code==='KeyA') moveLeft=true; if(e.code==='KeyD') moveRight=true;
+                    if(e.code==='ShiftLeft') isSprinting=true;
+                });
+                document.addEventListener('keyup', e => {
+                    if(e.code==='KeyW') moveForward=false; if(e.code==='KeyS') moveBackward=false;
+                    if(e.code==='KeyA') moveLeft=false; if(e.code==='KeyD') moveRight=false;
+                    if(e.code==='ShiftLeft') isSprinting=false;
+                });
+                document.addEventListener('mousemove', e => {
+                    if(!gameActive) return; camera.rotation.y -= e.movementX * 0.002;
+                });
+                document.addEventListener('pointerlockchange', () => {
+                    if(document.pointerLockElement !== document.body && gameActive && !isPaused) togglePause();
+                });
+            } else { setupMobileTouch(); }
+        }
+
+        function setupMobileTouch() {
+            const jArea = document.getElementById('joystick-area'); const jKnob = document.getElementById('joystick-knob');
+            const lArea = document.getElementById('look-area'); const runBtn = document.getElementById('sprint-btn');
+            let jOrigin = {x:0,y:0};
+            jArea.addEventListener('touchstart', e => { e.preventDefault(); const t = e.changedTouches[0]; joyTouchId = t.identifier; const r = jArea.getBoundingClientRect(); jOrigin = {x: r.left+r.width/2, y: r.top+r.height/2}; updateJoy(t.clientX, t.clientY); }, {passive:false});
+            jArea.addEventListener('touchmove', e => { e.preventDefault(); for(let i=0; i<e.changedTouches.length; i++) if(e.changedTouches[i].identifier === joyTouchId) updateJoy(e.changedTouches[i].clientX, e.changedTouches[i].clientY); }, {passive:false});
+            const endJoy = e => { for(let i=0; i<e.changedTouches.length; i++) if(e.changedTouches[i].identifier === joyTouchId) { joyTouchId = null; joystickVector = {x:0,y:0}; jKnob.style.transform = `translate(-50%, -50%)`; } };
+            jArea.addEventListener('touchend', endJoy);
+            function updateJoy(cx, cy) { const max = 40; let dx = cx - jOrigin.x, dy = cy - jOrigin.y; const d = Math.sqrt(dx*dx+dy*dy); if(d > max) { dx = (dx/d)*max; dy = (dy/d)*max; } jKnob.style.transform = `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px))`; joystickVector = {x: dx/max, y: dy/max}; }
+            lArea.addEventListener('touchstart', e => { e.preventDefault(); lookTouchId = e.changedTouches[0].identifier; prevLookX = e.changedTouches[0].clientX; }, {passive:false});
+            lArea.addEventListener('touchmove', e => { e.preventDefault(); for(let i=0; i<e.changedTouches.length; i++) { if(e.changedTouches[i].identifier === lookTouchId) { const cx = e.changedTouches[i].clientX; camera.rotation.y -= (cx - prevLookX) * 0.005; prevLookX = cx; } } }, {passive:false});
+            lArea.addEventListener('touchend', () => lookTouchId=null);
+            runBtn.addEventListener('touchstart', e => { e.preventDefault(); isSprinting=true; });
+            runBtn.addEventListener('touchend', e => { e.preventDefault(); isSprinting=false; });
+        }
+
+        function checkCol(x, z) {
+            for(let w of walls) { if(Math.abs(w.x-x)>40 || Math.abs(w.z-z)>40) continue; if(x > w.x-17 && x < w.x+17 && z > w.z-17 && z < w.z+17) return true; }
+            return false;
+        }
+
+        function animate() {
+            requestAnimationFrame(animate); if(!gameActive) return;
+            const time = performance.now(); const dt = (time - prevTime) / 1000; prevTime = time;
+            if(caughtCooldown) return;
+            let speed = (isSprinting && stamina>0) ? 55 : 25;
+            if(isSprinting) stamina-=12*dt; else stamina+=6*dt; stamina = Math.max(0, Math.min(100, stamina));
+            document.getElementById('stamina-bar').style.width = stamina+'%';
+            const dir = new THREE.Vector3(); camera.getWorldDirection(dir); dir.y=0; dir.normalize();
+            const side = new THREE.Vector3().crossVectors(dir, camera.up).normalize();
+            const v = new THREE.Vector3();
+            if(isMobile) { v.add(dir.clone().multiplyScalar(-joystickVector.y)); v.add(side.clone().multiplyScalar(joystickVector.x)); } else { if(moveForward) v.add(dir); if(moveBackward) v.sub(dir); if(moveRight) v.add(side); if(moveLeft) v.sub(side); }
+            v.normalize();
+            const nx = camera.position.x + v.x*speed*dt; if(!checkCol(nx, camera.position.z)) camera.position.x = nx;
+            const nz = camera.position.z + v.z*speed*dt; if(!checkCol(camera.position.x, nz)) camera.position.z = nz;
+            if(exitPos && camera.position.distanceTo(exitPos)<15) { gameActive = false; document.getElementById('blocker').style.display='flex'; document.getElementById('start-menu').style.display='none'; document.getElementById('end-menu').style.display='block'; return; }
+            const elapsedTime = time - startTime;
+            if(elapsedTime < 5000) { const msg = document.getElementById('status-msg'); msg.style.opacity = 1; msg.innerText = `安全時間: ${Math.ceil((5000-elapsedTime)/1000)}`; return; } else if (elapsedTime < 6000) document.getElementById('status-msg').style.opacity = 0;
+            let minD = 9999;
+            entities.forEach(ent => { if(!ent.active) return; updateEntity(ent, dt, time); const d = ent.mesh.position.distanceTo(camera.position); if(d < minD) minD = d; });
+            if(minD < 60) { const interval = 250 + (minD/60)*600; if(time-lastBeat > interval) { playHeartbeat(); lastBeat=time; } }
+            renderer.render(scene, camera);
+        }
+        function onResize() { camera.aspect = window.innerWidth/window.innerHeight; camera.updateProjectionMatrix(); renderer.setSize(window.innerWidth, window.innerHeight); }
+    </script>
+</body>
+</html>
